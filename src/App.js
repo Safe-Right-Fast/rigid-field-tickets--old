@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './Components/elements/Header';
 import Footer from './Components/elements/Footer';
-import { buildLogHandler, buildFetch } from './Utils/Functions/SRF_Proxy';
+import { buildSRFProxy } from './Utils/Functions/SRF_Proxy';
 const appTitle = "Field Tickets";
 
 
 const hostName = "https://saferightfast.quickbase.com";
+const iframeSrc = "https://saferightfast.quickbase.com/db/bucbxyva3?a=dbpage&pageID=10";
 const userAgent = "Rigid_Field_Tickets_Dev";
-
 
 const jobsTable = "bucbxzpaf";
 const jobNumber = 28;
@@ -16,20 +16,42 @@ const jobLocationName = 77;
 
 
 function App() {
-  const iframeRef = useRef(null);
-  const iframeSrc = "https://saferightfast.quickbase.com/db/bucbxyva3?a=dbpage&pageID=10";
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+    };
+}, []);
+
+
   const [jobs, setJobs] = useState([]);
 
-  const quickbaseFetch = buildFetch(iframeRef, hostName);
+  const {quickbaseFetch, logMessageHandler, ProxyFrame, frameIsAuthenticated, authenticateFrame} = buildSRFProxy(hostName, iframeSrc);
 
   useEffect(() => {
-    window.addEventListener('message', buildLogHandler(hostName));
+    window.addEventListener('message', logMessageHandler);
+
+    return () => {
+      window.removeEventListener('message', logMessageHandler);
+  };
   }, [])
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header appTitle={appTitle} />
       <main className="flex-grow flex flex-col items-center justify-center">
+      <button
+          className='text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800'
+          onClick={() => frameIsAuthenticated(jobsTable).then(res => alert(res)).catch(er => console.error(er))}
+          >Am I Auth?</button>
         <button
           className='text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800'
           onClick={() => quickbaseFetch("https://api.quickbase.com/v1/records/query", {
@@ -55,7 +77,7 @@ function App() {
           Click Me
         </button>
         <h1>Parent Page</h1>
-        <iframe ref={iframeRef} id="myIframe" src={iframeSrc} style={{ "width:600px": "height:400px" }}></iframe>
+        <ProxyFrame/>
       </main>
       {jobs.map(job => (
         <div key={`job${job[3].value}`}>
